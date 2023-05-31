@@ -1,4 +1,10 @@
+#!/usr/bin/env python3
+
 import random
+import openai
+
+# Set your OpenAI API key
+openai.api_key = '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'
 
 
 def run_quiz():
@@ -19,13 +25,7 @@ def run_quiz():
     # Logic for quiz scoring
     for question in questions:
         print(question)
-        while True:
-            answer = input().lower()
-
-            if answer in ["a", "b", "c"]:
-                break
-            else:
-                print("Invalid answer! Please choose 'a', 'b', or 'c'.")
+        answer = input().lower()
 
         if answer == "a":
             jedi_score += 1
@@ -34,6 +34,8 @@ def run_quiz():
         elif answer == "c":
             jedi_score += 1
             sith_score += 1
+        else:
+            print("Invalid answer! Skipping this question.")
 
     # Determine score and character
     if jedi_score > sith_score:
@@ -51,14 +53,12 @@ def generate_map(player_type):
     if player_type == "Jedi":
         # Generate Jedi map
         map_layout = [
-            ["Jedi Room 1", "Jedi Room 2"],
-            ["Jedi Room 3", "Jedi Room 4"]
+            ["Jedi Room 1", "Jedi Room 2", "Yoda's Room"]
         ]
     elif player_type == "Sith":
         # Generate Sith map
         map_layout = [
-            ["Sith Room 1", "Sith Room 2"],
-            ["Sith Room 3", "Sith Room 4"]
+            ["Sith Room 1", "Sith Room 2", "Sith Room 3"]
         ]
     else:
         raise ValueError("Invalid player type!")
@@ -80,10 +80,10 @@ def combat(player_type, combat_multiplier):
     print(f"Enemy roll: {enemy_roll}")
 
     if player_roll > enemy_roll:
-        print("You win the combat!")
+        print("You win the game!")
         return True
     elif player_roll < enemy_roll:
-        print("You lose the combat!")
+        print("You lose the game!")
         return False
     else:
         print("It's a tie!")
@@ -91,15 +91,9 @@ def combat(player_type, combat_multiplier):
 
 
 def make_decision(room_number, player_type, combat_multiplier):
-    if room_number == 1:
+    if room_number == "Jedi Room 1":
         print("You find a lightsaber on the ground. Do you pick it up? (Y/N)")
-        while True:
-            decision = input().upper()
-
-            if decision in ["Y", "N"]:
-                break
-            else:
-                print("Invalid answer! Please choose 'Y' or 'N'.")
+        decision = input().upper()
 
         if decision == "Y":
             combat_multiplier += 1
@@ -108,68 +102,79 @@ def make_decision(room_number, player_type, combat_multiplier):
             combat_multiplier -= 1
             print("You left the lightsaber behind. Your combat multiplier decreased by 1.")
 
-    elif room_number == 2:
-        print("You encounter a group of enemies. Do you engage them? (Y/N)")
-        while True:
-            decision = input().upper()
-
-            if decision in ["Y", "N"]:
-                break
-            else:
-                print("Invalid answer! Please choose 'Y' or 'N'.")
-
-        if decision == "Y":
-            combat_multiplier += 2
-            print("You engaged the enemies. Your combat multiplier increased by 2.")
-
     return combat_multiplier
 
 
-def main():
+def get_yoda_advice(prompt):
+    response = openai.Completion.create(
+        engine="davinci",
+        prompt=prompt,
+        max_tokens=50,
+        temperature=0.5,
+        top_p=1.0
+    )
+    advice = response.choices[0].text.strip().capitalize()
+
+    return advice
+
+
+def visit_yodas_room():
+    print("You enter Yoda's room. He imparts his wisdom upon you:")
+    prompt = "Give me life advice, Yoda."
+
+    yoda_speaks = "Yoda says:"
+    prompt_with_yoda = f"{yoda_speaks} {prompt}"
+    advice = get_yoda_advice(prompt_with_yoda)
+    print(f"{yoda_speaks} {advice[len(yoda_speaks):]}")
+
+
+def move_rooms(map_layout, current_room):
+    room_choice = input("Choose the room number to move to or 'yoda' to visit Yoda's room: ")
+
+    if room_choice.lower() == "yoda":
+        if current_room == "Yoda's Room":
+            print("You are already in Yoda's room.")
+        else:
+            print("Moving to Yoda's room...")
+            current_room = "Yoda's Room"
+            visit_yodas_room()
+    else:
+        try:
+            room_choice = int(room_choice)
+            if 1 <= room_choice <= len(map_layout[0]):
+                current_room = map_layout[0][room_choice - 1]
+                print(f"Moving to {current_room}...")
+            else:
+                print("Invalid room number!")
+        except ValueError:
+            print("Invalid input!")
+
+    return current_room
+
+
+def play_game():
     player_type = run_quiz()
     map_layout = generate_map(player_type)
+    current_room = map_layout[0][0]
     combat_multiplier = 1
 
-    print(f"Welcome, {player_type}! Let's begin your adventure.")
+    print("Game Start!")
+    print("Rooms: ", map_layout[0])
+    print(f"You are in {current_room}.\n")
 
     while True:
-        print("Select a room:")
-        for i, row in enumerate(map_layout):
-            for j, room in enumerate(row):
-                print(f"({i+1},{j+1}): {room}")
+        current_room = move_rooms(map_layout, current_room)
+        if current_room == "Yoda's Room":
+            continue
 
-        while True:
-            try:
-                room_choice = input("Enter the room coordinates (row,column): ")
-                room_choice = tuple(map(int, room_choice.split(',')))
-
-                if (
-                    len(room_choice) == 2
-                    and room_choice[0] in [1, 2]
-                    and room_choice[1] in [1, 2]
-                ):
-                    break
-                else:
-                    print("Invalid room coordinates! Please try again.")
-            except ValueError:
-                print("Invalid input! Please enter room coordinates as 'row,column'.")
-
-        room_number = map_layout[room_choice[0] - 1][room_choice[1] - 1]
-        combat_multiplier = make_decision(room_choice[0], player_type, combat_multiplier)
+        combat_multiplier = make_decision(current_room, player_type, combat_multiplier)
         result = combat(player_type, combat_multiplier)
-
-        if result:
-            print("Congratulations! You won the combat.")
-        else:
-            print("Game over. You lost the combat.")
-
-        play_again = input("Do you want to play again? (Y/N)").upper()
-        if play_again != "Y":
+        if not result:
+            print("Game Over!")
             break
 
-    print("Thank you for playing!")
+        print(f"You are in {current_room}.\n")
 
 
-if __name__ == "__main__":
-    main()
+play_game()
 
